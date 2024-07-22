@@ -1,99 +1,117 @@
-from .forms import RegistrationForm
+from .forms import RegistrationForm, ReviewForm
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login
 from .forms import LoginForm
 from django.contrib.auth.decorators import login_required
-from django.views import View
-from django.http import JsonResponse
 from .models import *
 
 
 @login_required(login_url='login')
-def home(request, category_slug= None):
-    categories = None
-    products = None
-    html_code = """<div class="carousel-inner">
-                <div class="carousel-item active">
-                    <img src="/images/sale11.png" class="d-block w-100" alt="...">
-                </div>
-                <div class="carousel-item">
-                    <img src="/images/sale22.png" class="d-block w-100" alt="...">
-                </div>
-                <div class="carousel-item">
-                    <img src="/images/sale33.png" class="d-block w-100" alt="...">
-                </div>
-            </div>"""
-    if category_slug != None:
-        categories = get_object_or_404(Category, category_slug)
+def home(request):
+    template_dir = 'app/menu.html'
+
     if 'q' in request.GET:
         q = request.GET['q']
         products = Product.objects.filter(name__icontains=q)
-        context = {'products': products}
     else:
         products = Product.objects.all()
-        context = {'products': products, 'html_code': html_code}
-    return render(request, 'menu.html', context)
+
+    context = {
+        'products': products,
+        "is_carousel": True,
+        "val": "",
+    }
+
+    return render(request, template_dir, context=context)
 
 
+def category(request, val):
+    template_dir = 'app/menu.html'
+
+    if 'q' in request.GET:
+        q = request.GET['q']
+        products = Product.objects.filter(name__icontains=q)
+    else:
+        products = Product.objects.filter(category=val)
+
+    context = {
+        "products": products,
+        "val": val,
+    }
+
+    return render(request, template_dir, context=context)
 
 
 @login_required(login_url='login')
 def product_detail(request, pk):
+    template_dir = 'app/shop-page.html'
+
     product = get_object_or_404(Product, pk=pk)
+    reviews = Review.objects.filter(product=product)
+    if request.method == "POST":
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            user = request.user
+            is_created = Review.objects.filter(user=user, product=product).exists()
+            if is_created:
+                rev = Review.objects.get(user=user, product=product)
+                rev.text = form.cleaned_data.get("text")
+                rev.save()
+            else:
+                review = form.save(commit=False)
+                review.user = user
+                review.product = product
+                review.save()
+    else:
+        form = ReviewForm()
 
-    context = {"product": product}
-    return render(request, 'shop-page.html',context)
+    context = {
+        "product": product,
+        "reviews": reviews,
+        "review_form": form,
+    }
 
-# def cart(request):
-#     user = request.user
-#     if request.user.is_authenticated:
-#         user = request.user.customer
-#         order, created = Order.objects.get_or_create(user = user, complete = False)
-#         products = order.orderitem_set.all()
-#     else:
-#         products = []
-#
-#     context = {'products': products}
-#     return render(request, 'menu.html', context)
+    return render(request, template_dir, context)
+
 
 def add_to_cart(request):
     user = request.user
     product_id = request.GET.get('prod_id')
-    product = Product.objects.get(id = product_id)
-    Cart(user = user, product = product).save()
+    product = Product.objects.get(id=product_id)
+    Cart(user=user, product=product).save()
+
     return redirect('/')
 
+
 def show_cart(request):
+    template_dir = 'app/cart.html'
+
     user = request.user
-    cart = Cart.objects.filter(user = user)
+    cart = Cart.objects.filter(user=user)
     amount = 0
     for p in cart:
         value = p.quantity * p.product.cost
         amount = amount + value
     total_amount = amount
-    return render(request,'cart.html', locals())
 
-# def remove_cart(request):
-#     if request.method == 'GET':
-#         prod_id = request.GET['prod_id']
-#         c = Cart.objects.get(Q(product = prod_id) & Q(user = request.user))
-#         c.delete
-#         user = request.user
-#         cart = Cart.objects.filter(user=user)
-#         amount = 0
-#         for p in cart:
-#             value = p.quantity * p.product.cost
-#             amount = amount + value
-#         total_amount = amount
-#         data = {
-#             'amount': amount,
-#             'total_amount': total_amount
-#         }
-#
-#         return JsonResponse(data)
+    return render(request, template_dir, locals())
+
+
+def thx(request):
+    template_dir = 'app/thx.html'
+
+    user = request.user
+    cart = Cart.objects.filter(user=user)
+
+    for c in cart:
+        c.delete()
+
+    return render(request, template_dir, locals())
 
 
 def register(request):
+    template_dir = 'app/register.html'
+
     if request.method == 'POST':
         form = RegistrationForm(request.POST)
         if form.is_valid():
@@ -101,10 +119,17 @@ def register(request):
             return redirect('login')
     else:
         form = RegistrationForm()
-    return render(request, 'registration.html', {'form': form})
+
+    context = {
+        'form': form
+    }
+
+    return render(request, template_dir, context=context)
 
 
 def user_login(request):
+    template_dir = 'app/login.html'
+
     if request.method == 'POST':
         form = LoginForm(request, data=request.POST)
         if form.is_valid():
@@ -116,23 +141,22 @@ def user_login(request):
                 return redirect('/')
     else:
         form = LoginForm()
-    return render(request, 'login.html', {'form': form})
 
-class CategoryView(View):
-    def get(self, request, val):
-        products = Product.objects.filter(category = val)
-        return render(request, 'menu.html', locals())
+    context = {
+        'form': form
+    }
+
+    return render(request, template_dir, context=context)
 
 
 @login_required
 def profile(request):
-    user = request.user
-    return render(request, 'menu.html', {'user': user})
+    template_dir = 'app/menu.html'
 
-def thx(request):
     user = request.user
-    cart = Cart.objects.filter(user = user)
-    for c in cart:
-        c.delete()
-    #     4:53:55
-    return render(request, 'thx.html',locals())
+
+    context = {
+        'user': user
+    }
+
+    return render(request, template_dir, context=context)

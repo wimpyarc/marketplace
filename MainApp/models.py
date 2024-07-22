@@ -1,15 +1,17 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+
 User = settings.AUTH_USER_MODEL
 
-CATEGORY_CHOISES = (('CT','Clothes'),
-                    ('SH','Shoes'),
-                    ('H','Home'),
-                    ('BH','Beauty & Health'),
-                    ('FK','Kids'),
-                    ('F','Food'),
+CATEGORY_CHOISES = (('CT', 'Clothes'),
+                    ('SH', 'Shoes'),
+                    ('H', 'Home'),
+                    ('BH', 'Beauty & Health'),
+                    ('FK', 'Kids'),
+                    ('F', 'Food'),
                     ('ST', 'Stationery'))
+
 
 class CustomUser(AbstractUser):
     phone_number = models.CharField(max_length=12)
@@ -26,7 +28,7 @@ class Customer(models.Model):
     email = models.CharField(max_length=200)
     ph_number = models.CharField(max_length=200)
     address = models.CharField(max_length=100, null=True)
-    password = models.CharField(max_length=200, null = True)
+    password = models.CharField(max_length=200, null=True)
 
     def __str__(self):
         return self.name
@@ -38,9 +40,8 @@ class Product(models.Model):
     cost = models.FloatField()
     raiting = models.FloatField()
     features = models.CharField(max_length=200, null=True)
-    category = models.CharField(choices=CATEGORY_CHOISES, max_length=2, null = True)
+    category = models.CharField(choices=CATEGORY_CHOISES, max_length=2, null=True)
     image = models.ImageField(null=True, blank=True)
-
 
     def __str__(self):
         return self.name
@@ -80,13 +81,21 @@ class ShippingAddress(models.Model):
     def __str__(self):
         return self.address
 
+
 class Cart(models.Model):
-    user = models.ForeignKey(User, on_delete = models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
-
-
 
     @property
     def total_cost(self):
         return self.quantity * self.product.cost
+
+
+class Review(models.Model):
+    text = models.CharField(max_length=120)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.text
